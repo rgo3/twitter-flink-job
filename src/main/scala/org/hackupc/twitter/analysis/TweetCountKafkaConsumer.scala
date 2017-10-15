@@ -18,10 +18,12 @@ package org.hackupc.twitter.analysis
  * limitations under the License.
  */
 
+import java.net.{InetAddress, InetSocketAddress}
 import java.util.Properties
 
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer010, FlinkKafkaConsumer082}
+import org.apache.flink.streaming.api.windowing.time.Time
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer010
 import org.apache.flink.streaming.util.serialization.SimpleStringSchema
 
 
@@ -32,15 +34,22 @@ object TweetCountKafkaConsumer {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
 
     // set properties to connect to kafka
-    val properties = new Properties()
-    properties.setProperty("bootstrap.servers", "54.218.59.178:9092,54.186.93.122:9092")
-    properties.setProperty("group.id", "test")
+    val kafkaProperties = new Properties()
+    kafkaProperties.setProperty("bootstrap.servers", "54.218.59.178:9092,54.186.93.122:9092")
+    kafkaProperties.setProperty("group.id", "test")
+
     val stream = env
-      .addSource(new FlinkKafkaConsumer010[String]("tweets-test", new SimpleStringSchema(), properties))
+      .addSource(new FlinkKafkaConsumer010[String]("tweets-test", new SimpleStringSchema(), kafkaProperties))
     // create streams for names and ages by mapping the inputs to the corresponding objects
-    stream.printToErr()
+    val eventCounter = stream
+      .map((_, 1))
+      .keyBy(1)
+      .timeWindow(Time.seconds(5))
+      .reduce((r, l) => ("count", r._2 + l._2))
+      .print
 
 
     env.execute("Scala TweetCount from KafkaSource")
   }
+
 }
